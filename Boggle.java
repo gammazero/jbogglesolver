@@ -73,6 +73,7 @@ public class Boggle {
             "[-y height] [dictionary_file]";
 
         boolean helpOpt = false;
+        boolean preCalcAdj = false;
         String errMsg = null;
         String dictFile = null;
         String infile = null;
@@ -111,6 +112,8 @@ public class Boggle {
                     }
                     infile = argv[i++];
                     argc--;
+                } else if (arg.equals("-p")) {
+                    preCalcAdj = true;
                 } else if (arg.equals("-qq")) {
                     quietLevel = 2;
                 } else if (arg.equals("-q")) {
@@ -140,6 +143,7 @@ public class Boggle {
                 "-f file : file to read characters of board from\n"+
                 "-h      : print this help message and exit (also --help)\n"+
                 "-l      : sort words longest-first\n"+
+                "-p      : pre-calculate adjacency matrix\n"+
                 "-q      : do not display grid\n"+
                 "-qq     : do not display grid or solutions\n"+
                 "-s      : sort words shortest-first\n"+
@@ -154,19 +158,20 @@ public class Boggle {
             return;
         }
 
-        runBoard(dictFile, xlen, ylen, sortType, infile, quietLevel, benchmark);
+        runBoard(dictFile, xlen, ylen, sortType, infile, quietLevel, benchmark,
+                 preCalcAdj);
         return;
     }
 
     private static void runBoard(String dictFile, int xlen, int ylen,
                                  int sortType, String inFile, int quietLevel,
-                                 boolean benchmark) {
+                                 boolean benchmark, boolean preCalcAdj) {
         if (dictFile == null) {
             dictFile = DEFAULT_DICT;
         }
 
-        int boardSize = xlen * ylen;
-        BoggleSolver solver = new BoggleSolver(xlen, ylen, boardSize, 3);
+        BoggleSolver solver = new BoggleSolver(xlen, ylen, preCalcAdj);
+        int boardSize = solver.boardSize();
         int wordCount = solver.loadDictionary(dictFile);
         System.out.format("Loaded %d words from dictionary.", wordCount);
         if (wordCount == 0) {

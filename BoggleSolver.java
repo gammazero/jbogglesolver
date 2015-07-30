@@ -54,8 +54,6 @@ public class BoggleSolver {
     private final int rows;
     private final int cols;
     private final int boardSize;
-    private final int minLen;
-    private final int maxLen;
     private Trie root;
 
     private final int[][] adjacency;
@@ -69,30 +67,34 @@ public class BoggleSolver {
      *
      * @param xlen X dimension (width) of board.
      * @param ylen Y dimension (height) of board.
-     * @param maxLen Valid words must not have more than this many letters.
-     * @param minLen Valid words must have at least this many letters.
      */
-    public BoggleSolver(int xlen, int ylen, int maxLen, int minLen) {
+    public BoggleSolver(int xlen, int ylen, boolean preCalcAdjacency) {
         assert(xlen > 1);
         assert(ylen > 1);
-        assert(minLen > 1);
-        assert(maxLen <= xlen * ylen);
-        assert(minLen <= maxLen);
 
         this.boardSize = xlen * ylen;
         this.cols = xlen;
         this.rows = ylen;
-        this.minLen = minLen;
-        this.maxLen = maxLen;
         this.root = null;
-        this.adjacency = calculateAdjacency(xlen, ylen);
+        if (preCalcAdjacency) {
+            this.adjacency = calculateAdjacencyMatrix(xlen, ylen);
+        } else {
+            this.adjacency = null;
+        }
     }
 
     /**
      * Create and initialize BoggleSolver instance with default values.
      */
     public BoggleSolver() {
-        this(4, 4, 16, 3);
+        this(4, 4, false);
+    }
+
+    /**
+     * Return size of board (x * y).
+     */
+    public int boardSize() {
+        return boardSize;
     }
 
     /**
@@ -128,7 +130,7 @@ public class BoggleSolver {
         try {
             while ((word = in.readLine()) != null) {
                 // Skip words that are too long or too short.
-                if (word.length() > maxLen || word.length() < minLen) {
+                if (word.length() > boardSize || word.length() < 3) {
                     continue;
                 }
                 // Skip words that start with capital letter.
@@ -177,8 +179,10 @@ public class BoggleSolver {
         Trie trie = root;
         Set<String> words = new HashSet<String>();
         Queue<QNode> q = new LinkedList<QNode>();
-
-        for (int initSq=0; initSq < adjacency.length; ++initSq) {
+        int[] adj = new int[8];
+        int[] sqAdj = adj;
+        int adjCount;
+        for (int initSq=0; initSq < boardSize; ++initSq) {
             char c = board[initSq];
             int[] seen = {initSq};
             String s = Character.toString(c);
@@ -190,7 +194,14 @@ public class BoggleSolver {
                 String prefix = qn.getPrefix();
                 Trie parentTrie = qn.getParentTrie();
                 seen = qn.getSeen();
-                for (int curSq : adjacency[parentSq]) {
+                if (null == adjacency) {
+                    adjCount = calcAdjacency(cols, rows, parentSq, adj);
+                } else {
+                    sqAdj = adjacency[parentSq];
+                    adjCount = sqAdj.length;
+                }
+                for (int a = 0; a < adjCount; ++a) {
+                    int curSq = sqAdj[a];
                     boolean hasCur = false;
                     for (int x : seen) {
                         if (x == curSq) {
@@ -280,69 +291,65 @@ public class BoggleSolver {
      *
      * @return Array of adjacency arrays.
      */
-    private static int[][] calculateAdjacency(int xlim, int ylim) {
+    private static int[][] calculateAdjacencyMatrix(int xlim, int ylim) {
         // Initialize array
-        int[][] adj_list = new int[ylim*xlim][];
+        int[][] adjList = new int[ylim*xlim][];
         int[] adj = new int[8];
 
-        for (int y=0; y < ylim; ++y) {
-            for (int x=0; x < xlim; ++x) {
-                // Current cell index = y * xlim + x
-                int cell_x, cell_y;
-                int i = 0;
+        for (int sq=0; sq < (xlim * ylim); ++sq) {
+            int i = calcAdjacency(xlim, ylim, sq, adj);
+            int[] adjfinal = new int[i];
+            System.arraycopy(adj, 0, adjfinal, 0, i);
+            adjList[sq] = adjfinal;
+        }
+        return adjList;
+    }
 
-                // Look at row above current cell.
-                cell_y = y-1;
-                if (cell_y >= 0) {
-                    // Look to upper left.
-                    cell_x = x-1;
-                    if (cell_x >=0) {
-                        adj[i++] = cell_y*xlim + cell_x;
-                    }
-                    // Look above.
-                    cell_x = x;
-                    adj[i++] = cell_y*xlim + cell_x;
-                    // Look upper right.
-                    cell_x = x+1;
-                    if (cell_x < xlim) {
-                        adj[i++] = cell_y*xlim + cell_x;
-                    }
-                }
-                // Look at same row that current cell is on.
-                cell_y = y;
-                // Look to left of current cell.
-                cell_x = x-1;
-                if (cell_x >=0) {
-                    adj[i++] = cell_y*xlim + cell_x;
-                }
-                // Look to right of current cell.
-                cell_x = x+1;
-                if (cell_x < xlim) {
-                    adj[i++] = cell_y*xlim + cell_x;
-                }
-                // Look at row below current cell.
-                cell_y = y+1;
-                if (cell_y < ylim) {
-                    // Look to lower left.
-                    cell_x = x-1;
-                    if (cell_x >= 0) {
-                        adj[i++] = cell_y*xlim + cell_x;
-                    }
-                    // Look below.
-                    cell_x = x;
-                    adj[i++] = cell_y*xlim + cell_x;
-                    // Look to lower rigth.
-                    cell_x = x+1;
-                    if (cell_x < xlim) {
-                        adj[i++] = cell_y*xlim + cell_x;
-                    }
-                }
-                int[] adjfinal = new int[i];
-                System.arraycopy(adj, 0, adjfinal, 0, i);
-                adj_list[y*xlim + x] = adjfinal;
+    private static int calcAdjacency(int xlim, int ylim, int sq, int[] adj) {
+        // Current cell index = y * xlim + x
+        int y = sq / xlim;
+        int x = sq - (y * xlim);
+        int above, below;
+        int i = 0;
+
+        // Look at row above current cell.
+        if (y-1 >= 0) {
+            above = sq - xlim;
+            // Look to upper left.
+            if (x-1 >=0) {
+                adj[i++] = above - 1;
+            }
+            // Look above.
+            adj[i++] = above;
+            // Look upper right.
+            if (x+1 < xlim) {
+                adj[i++] = above + 1;
             }
         }
-        return adj_list;
+        // Look at same row that current cell is on.
+        // Look to left of current cell.
+        if (x-1 >=0) {
+            adj[i++] = sq - 1;
+        }
+        // Look to right of current cell.
+        if (x+1 < xlim) {
+            adj[i++] = sq + 1;
+        }
+        // Look at row below current cell.
+        if (y+1 < ylim) {
+            below = sq + xlim;
+            // Look to lower left.
+            if (x-1 >= 0) {
+                adj[i++] = below - 1;
+            }
+            // Look below.
+            adj[i++] = below;
+            // Look to lower rigth.
+            if (x+1 < xlim) {
+                adj[i++] = below + 1;
+            }
+        }
+        return i;
     }
 
 }
