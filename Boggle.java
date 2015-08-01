@@ -60,7 +60,7 @@ public class Boggle {
     private static final int ALPHA=0;
     private static final int LONGEST=1;
     private static final int SHORTEST=2;
-    private static final String DEFAULT_DICT="boggle_dict.txt.gz";
+    private static final String DEFAULT_WORDS="boggle_dict.txt.gz";
 
     public static void main(String[] argv) {
         int xlen = 4;
@@ -70,12 +70,12 @@ public class Boggle {
         boolean benchmark = false;
 
         String usageMsg = "usage: java Boggle [option].. [-x width] "+
-            "[-y height] [dictionary_file]";
+            "[-y height] [words_file]";
 
         boolean helpOpt = false;
         boolean preCalcAdj = false;
         String errMsg = null;
-        String dictFile = null;
+        String wordsFile = null;
         String infile = null;
 
         for (int i=0, argc = argv.length; argc > 0;) {
@@ -125,7 +125,7 @@ public class Boggle {
                     break;
                 }
             } else {
-                dictFile = arg;
+                wordsFile = arg;
             }
         }
 
@@ -154,27 +154,26 @@ public class Boggle {
                 "alphabetically.\n"+
                 "If -x is not specified, then x-length is set to 4.\n"+
                 "If -y is not specified, then y-length is set to 4.\n"+
-                "If no dictionary file is given, then use "+DEFAULT_DICT);
+                "If no words file is given, then use "+DEFAULT_WORDS);
             return;
         }
 
-        runBoard(dictFile, xlen, ylen, sortType, infile, quietLevel, benchmark,
-                 preCalcAdj);
+        runBoard(wordsFile, xlen, ylen, sortType, infile, quietLevel,
+                 benchmark, preCalcAdj);
         return;
     }
 
-    private static void runBoard(String dictFile, int xlen, int ylen,
+    private static void runBoard(String wordsFile, int xlen, int ylen,
                                  int sortType, String inFile, int quietLevel,
                                  boolean benchmark, boolean preCalcAdj) {
-        if (dictFile == null) {
-            dictFile = DEFAULT_DICT;
+        if (wordsFile == null) {
+            wordsFile = DEFAULT_WORDS;
         }
 
-        BoggleSolver solver = new BoggleSolver(xlen, ylen, preCalcAdj);
+        BoggleSolver solver = new BoggleSolver(xlen, ylen, wordsFile,
+                                               preCalcAdj);
         int boardSize = solver.boardSize();
-        int wordCount = solver.loadDictionary(dictFile);
-        System.out.format("Loaded %d words from dictionary.", wordCount);
-        if (wordCount == 0) {
+        if (-1 == boardSize) {
             return;
         }
 

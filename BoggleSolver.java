@@ -68,26 +68,35 @@ public class BoggleSolver {
      * @param xlen X dimension (width) of board.
      * @param ylen Y dimension (height) of board.
      */
-    public BoggleSolver(int xlen, int ylen, boolean preCalcAdjacency) {
+    public BoggleSolver(int xlen, int ylen, String wordsFile,
+                        boolean preCalcAdjacency) {
         assert(xlen > 1);
         assert(ylen > 1);
 
-        this.boardSize = xlen * ylen;
+        int boardSize = xlen * ylen;
         this.cols = xlen;
         this.rows = ylen;
-        this.root = null;
         if (preCalcAdjacency) {
             this.adjacency = calculateAdjacencyMatrix(xlen, ylen);
         } else {
             this.adjacency = null;
+        }
+        this.root = loadDictionary(wordsFile, boardSize, 3);
+
+        // If the words file could not be read, indicate that something is
+        // wrong and prevent solver from running.
+        if (null == this.root) {
+            this.boardSize = -1;
+        } else {
+            this.boardSize = boardSize;
         }
     }
 
     /**
      * Create and initialize BoggleSolver instance with default values.
      */
-    public BoggleSolver() {
-        this(4, 4, false);
+    public BoggleSolver(String wordsFile) {
+        this(4, 4, wordsFile, false);
     }
 
     /**
@@ -95,69 +104,6 @@ public class BoggleSolver {
      */
     public int boardSize() {
         return boardSize;
-    }
-
-    /**
-     * Private method to create the trie for finding words.
-     * @param wordsFile Path of file containing words for reference.
-     *
-     * @return root node of populated trie.
-    */
-    public int loadDictionary(String wordsFile) {
-        System.out.println("creating dictionary...");
-        BufferedReader in ;
-        try {
-            if (wordsFile.endsWith(".gz")) {
-                FileInputStream istr = new FileInputStream(wordsFile);
-                java.util.zip.GZIPInputStream gzis;
-                gzis = new java.util.zip.GZIPInputStream(istr);
-                in = new BufferedReader(new InputStreamReader(gzis));
-            } else {
-                in = new BufferedReader(new FileReader(wordsFile));
-            }
-        } catch(java.io.FileNotFoundException e) {
-            System.err.println("ERROR: unable to open dictionary file: " +
-                               wordsFile);
-            return 0;
-        } catch(IOException e) {
-            System.err.println("ERROR: unable to open dictionary file: " +
-                               wordsFile);
-            return 0;
-        }
-        root = new Trie();
-        String word;
-        int wordCount = 0;
-        try {
-            while ((word = in.readLine()) != null) {
-                // Skip words that are too long or too short.
-                if (word.length() > boardSize || word.length() < 3) {
-                    continue;
-                }
-                // Skip words that start with capital letter.
-                if (word.charAt(0) < 'a') {
-                    continue;
-                }
-                if (word.charAt(0) == 'q') {
-                    // Skip words starting with q not followed by u.
-                    if (word.charAt(1) != 'u') {
-                        continue;
-                    }
-                    // Remove "u" from q-words so that only the q is matched.
-                    word = "q" + word.substring(2);
-                }
-
-                //System.out.println("adding word: " + word);
-                root.insert(word);
-                ++wordCount;
-            }
-            System.out.println("finished creating dictionary");
-        } catch(java.io.IOException e) {
-            System.err.println("ERROR: cannot read dictionary file: " +
-                               wordsFile);
-            root = null;
-            wordCount = 0;
-        }
-        return wordCount;
     }
 
     /**
@@ -170,6 +116,10 @@ public class BoggleSolver {
      * grid.
      */
     public Set<String> solve(String grid) {
+        if (null == this.root) {
+            System.err.println("ERROR: failed to read words file");
+            return null;
+        }
         if (grid.length() != boardSize) {
             System.err.println("ERROR: invalid board");
             return null;
@@ -278,6 +228,71 @@ public class BoggleSolver {
             System.out.println(line.toString());
         }
         System.out.println(hline);
+    }
+
+    /**
+     * Private method to create the trie for finding words.
+     * @param wordsFile Path of file containing words for reference.
+     *
+     * @return root node of populated trie.
+    */
+    private static Trie loadDictionary(String wordsFile, int maxLen,
+                                       int minLen) {
+        System.out.println("creating dictionary...");
+        BufferedReader in ;
+        try {
+            if (wordsFile.endsWith(".gz")) {
+                FileInputStream istr = new FileInputStream(wordsFile);
+                java.util.zip.GZIPInputStream gzis;
+                gzis = new java.util.zip.GZIPInputStream(istr);
+                in = new BufferedReader(new InputStreamReader(gzis));
+            } else {
+                in = new BufferedReader(new FileReader(wordsFile));
+            }
+        } catch(java.io.FileNotFoundException e) {
+            System.err.println("ERROR: unable to open dictionary file: " +
+                               wordsFile);
+            return null;
+        } catch(IOException e) {
+            System.err.println("ERROR: unable to open dictionary file: " +
+                               wordsFile);
+            return null;
+        }
+        Trie root = new Trie();
+        String word;
+        int wordCount = 0;
+        try {
+            while ((word = in.readLine()) != null) {
+                // Skip words that are too long or too short.
+                if (word.length() > maxLen || word.length() < minLen) {
+                    continue;
+                }
+                // Skip words that start with capital letter.
+                if (word.charAt(0) < 'a') {
+                    continue;
+                }
+                if (word.charAt(0) == 'q') {
+                    // Skip words starting with q not followed by u.
+                    if (word.charAt(1) != 'u') {
+                        continue;
+                    }
+                    // Remove "u" from q-words so that only the q is matched.
+                    word = "q" + word.substring(2);
+                }
+
+                //System.out.println("adding word: " + word);
+                root.insert(word);
+                ++wordCount;
+            }
+            System.out.println("finished creating dictionary");
+        } catch(java.io.IOException e) {
+            System.err.println("ERROR: cannot read dictionary file: " +
+                               wordsFile);
+            root = null;
+            wordCount = 0;
+        }
+        System.out.format("Loaded %d words from file.", wordCount);
+        return root;
     }
 
     /**
